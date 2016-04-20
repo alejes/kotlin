@@ -103,7 +103,11 @@ class ControlFlowProcessor(private val trace: BindingTrace) {
         builder.bindLabel(afterDeclaration)
     }
 
+    private class CatchFinallyLabels(val onException: Label?, val toFinally: Label?, val tryExpression: KtTryExpression?)
+
     private inner class CFPVisitor(private val builder: ControlFlowBuilder) : KtVisitorVoid() {
+
+        private val catchFinallyStack = Stack<CatchFinallyLabels>()
 
         private val conditionVisitor = object : KtVisitorVoid() {
 
@@ -566,9 +570,11 @@ class ControlFlowProcessor(private val trace: BindingTrace) {
 
             fun generate() {
                 val finalExpression = finallyBlock?.finalExpression ?: return
+                catchFinallyStack.push(CatchFinallyLabels(null, null, null))
                 startFinally?.let {
                     assert(finishFinally != null) { "startFinally label is set to $startFinally but finishFinally label is not set" }
                     builder.repeatPseudocode(it, finishFinally!!)
+                    catchFinallyStack.pop()
                     return
                 }
                 builder.createUnboundLabel("start finally").let {
@@ -580,6 +586,7 @@ class ControlFlowProcessor(private val trace: BindingTrace) {
                     finishFinally = it
                     builder.bindLabel(it)
                 }
+                catchFinallyStack.pop()
             }
         }
 
@@ -646,9 +653,15 @@ class ControlFlowProcessor(private val trace: BindingTrace) {
             }
 
             val tryBlock = expression.tryBlock
+            catchFinallyStack.push(CatchFinallyLabels(onException, onExceptionToFinallyBlock, expression))
             generateInstructions(tryBlock)
+            catchFinallyStack.pop()
 
             if (hasCatches && onException != null) {
+                builder.nondeterministicJump(onException, expression, null)
+                if (onExceptionToFinallyBlock != null) {
+                    builder.nondeterministicJump(onExceptionToFinallyBlock, expression, null)
+                }
                 val afterCatches = builder.createUnboundLabel("afterCatches")
                 builder.jump(afterCatches, expression)
 
@@ -795,6 +808,7 @@ class ControlFlowProcessor(private val trace: BindingTrace) {
         override fun visitBreakExpression(expression: KtBreakExpression) {
             val loop = getCorrespondingLoop(expression)
             if (loop != null) {
+                generateJumpsToCatchAndFinally()
                 if (jumpDoesNotCrossFunctionBoundary(expression, loop)) {
                     builder.getLoopExitPoint(loop)?.let { builder.jump(it, expression) }
                 }
@@ -804,6 +818,7 @@ class ControlFlowProcessor(private val trace: BindingTrace) {
         override fun visitContinueExpression(expression: KtContinueExpression) {
             val loop = getCorrespondingLoop(expression)
             if (loop != null) {
+                generateJumpsToCatchAndFinally()
                 if (jumpDoesNotCrossFunctionBoundary(expression, loop)) {
                     builder.getLoopConditionEntryPoint(loop)?.let { builder.jump(it, expression) }
                 }
@@ -881,6 +896,7 @@ class ControlFlowProcessor(private val trace: BindingTrace) {
         }
 
         override fun visitReturnExpression(expression: KtReturnExpression) {
+            generateJumpsToCatchAndFinally()
             val returnedExpression = expression.returnedExpression
             if (returnedExpression != null) {
                 generateInstructions(returnedExpression)
@@ -1120,15 +1136,30 @@ class ControlFlowProcessor(private val trace: BindingTrace) {
             }
         }
 
+        private fun generateJumpsToCatchAndFinally() {
+            if (catchFinallyStack.isNotEmpty()) {
+                with(catchFinallyStack.peek()) {
+                    if (tryExpression != null) {
+                        onException?.let {
+                            builder.nondeterministicJump(it, tryExpression, null)
+                        }
+                        toFinally?.let {
+                            builder.nondeterministicJump(it, tryExpression, null)
+                        }
+                    }
+                }
+            }
+        }
+
         override fun visitThrowExpression(expression: KtThrowExpression) {
             mark(expression)
 
-            val thrownExpression = expression.thrownExpression ?: return
+            generateJumpsToCatchAndFinally()
 
+            val thrownExpression = expression.thrownExpression ?: return
             generateInstructions(thrownExpression)
 
             val thrownValue = builder.getBoundValue(thrownExpression) ?: return
-
             builder.throwException(expression, thrownValue)
         }
 
