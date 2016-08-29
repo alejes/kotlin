@@ -65,7 +65,9 @@ class ResolveElementCache(
                 // data on any modification of the file
                 !file.isPhysical -> file.modificationStamp
 
-                resolveElement is KtDeclaration && KotlinCodeBlockModificationListener.isBlockDeclaration(resolveElement) -> resolveElement.getModificationStamp()
+                resolveElement is KtDeclaration && KotlinCodeBlockModificationListener.isBlockDeclaration(resolveElement) -> {
+                    resolveElement.getModificationStamp()
+                }
                 resolveElement is KtSuperTypeList -> resolveElement.modificationStamp
                 else -> null
             }
@@ -94,13 +96,14 @@ class ResolveElementCache(
         }
     }
 
-    private val partialBodyResolveCache: CachedValue<MutableMap<KtExpression, CachedPartialResolve>> = CachedValuesManager.getManager(project).createCachedValue(
-            CachedValueProvider<kotlin.collections.MutableMap<KtExpression, ResolveElementCache.CachedPartialResolve>> {
-                CachedValueProvider.Result.create(ContainerUtil.createConcurrentSoftValueMap<KtExpression, CachedPartialResolve>(),
-                                                         PsiModificationTracker.MODIFICATION_COUNT,
-                                                         resolveSession.exceptionTracker)
-            },
-            false)
+    private val partialBodyResolveCache: CachedValue<MutableMap<KtExpression, CachedPartialResolve>> =
+            CachedValuesManager.getManager(project).createCachedValue(
+                    CachedValueProvider<kotlin.collections.MutableMap<KtExpression, ResolveElementCache.CachedPartialResolve>> {
+                        CachedValueProvider.Result.create(ContainerUtil.createConcurrentSoftValueMap<KtExpression, CachedPartialResolve>(),
+                                                          PsiModificationTracker.MODIFICATION_COUNT,
+                                                          resolveSession.exceptionTracker)
+                    },
+                    false)
 
 
     private fun probablyNothingCallableNames(): ProbablyNothingCallableNames {
@@ -162,7 +165,9 @@ class ResolveElementCache(
                         partialResolveMap[statement] = resolveToCache
                     }
                 }
-                partialResolveMap[resolveElement] = resolveToCache // we use the whole declaration key in the map to obtain resolve not inside any block (e.g. default parameter values)
+
+                // we use the whole declaration key in the map to obtain resolve not inside any block (e.g. default parameter values)
+                partialResolveMap[resolveElement] = resolveToCache
 
                 return bindingContext
             }
@@ -254,7 +259,8 @@ class ResolveElementCache(
         }
     }
 
-    private fun performElementAdditionalResolve(resolveElement: KtElement, contextElement: KtElement, bodyResolveMode: BodyResolveMode): Pair<BindingContext, StatementFilter> {
+    private fun performElementAdditionalResolve(resolveElement: KtElement, contextElement: KtElement,
+                                                bodyResolveMode: BodyResolveMode): Pair<BindingContext, StatementFilter> {
         val file = resolveElement.getContainingKtFile()
 
         var statementFilterUsed = StatementFilter.NONE
@@ -414,7 +420,8 @@ class ResolveElementCache(
         return resolveSession.trace
     }
 
-    private fun delegationSpecifierAdditionalResolve(resolveSession: ResolveSession, ktElement: KtElement, classOrObject: KtClassOrObject, file: KtFile): BindingTrace {
+    private fun delegationSpecifierAdditionalResolve(resolveSession: ResolveSession, ktElement: KtElement,
+                                                     classOrObject: KtClassOrObject, file: KtFile): BindingTrace {
         val trace = createDelegatingTrace(ktElement)
         val descriptor = resolveSession.resolveToDescriptor(classOrObject) as LazyClassDescriptor
 
@@ -432,7 +439,8 @@ class ResolveElementCache(
         return trace
     }
 
-    private fun propertyAdditionalResolve(resolveSession: ResolveSession, property: KtProperty, file: KtFile, statementFilter: StatementFilter): BindingTrace {
+    private fun propertyAdditionalResolve(resolveSession: ResolveSession, property: KtProperty,
+                                          file: KtFile, statementFilter: StatementFilter): BindingTrace {
         val trace = createDelegatingTrace(property)
 
         val bodyResolver = createBodyResolver(resolveSession, trace, file, statementFilter)
@@ -457,7 +465,8 @@ class ResolveElementCache(
         return trace
     }
 
-    private fun functionAdditionalResolve(resolveSession: ResolveSession, namedFunction: KtNamedFunction, file: KtFile, statementFilter: StatementFilter): BindingTrace {
+    private fun functionAdditionalResolve(resolveSession: ResolveSession, namedFunction: KtNamedFunction, file: KtFile,
+                                          statementFilter: StatementFilter): BindingTrace {
         val trace = createDelegatingTrace(namedFunction)
 
         val scope = resolveSession.declarationScopeProvider.getResolutionScopeForDeclaration(namedFunction)
@@ -472,7 +481,8 @@ class ResolveElementCache(
         return trace
     }
 
-    private fun secondaryConstructorAdditionalResolve(resolveSession: ResolveSession, constructor: KtSecondaryConstructor, file: KtFile, statementFilter: StatementFilter): BindingTrace {
+    private fun secondaryConstructorAdditionalResolve(resolveSession: ResolveSession, constructor: KtSecondaryConstructor,
+                                                      file: KtFile, statementFilter: StatementFilter): BindingTrace {
         val trace = createDelegatingTrace(constructor)
 
         val scope = resolveSession.declarationScopeProvider.getResolutionScopeForDeclaration(constructor)
@@ -493,7 +503,8 @@ class ResolveElementCache(
 
         val classDescriptor = resolveSession.resolveToDescriptor(klass) as ClassDescriptor
         val constructorDescriptor = classDescriptor.unsubstitutedPrimaryConstructor
-                                    ?: error("Can't get primary constructor for descriptor '$classDescriptor' in from class '${klass.getElementTextWithContext()}'")
+                                    ?: error("Can't get primary constructor for descriptor '$classDescriptor' " +
+                                             "in from class '${klass.getElementTextWithContext()}'")
 
         val bodyResolver = createBodyResolver(resolveSession, trace, file, StatementFilter.NONE)
         bodyResolver.resolveConstructorParameterDefaultValuesAndAnnotations(DataFlowInfo.EMPTY, trace, klass, constructorDescriptor, scope)
@@ -501,7 +512,8 @@ class ResolveElementCache(
         return trace
     }
 
-    private fun initializerAdditionalResolve(resolveSession: ResolveSession, anonymousInitializer: KtAnonymousInitializer, file: KtFile, statementFilter: StatementFilter): BindingTrace {
+    private fun initializerAdditionalResolve(resolveSession: ResolveSession, anonymousInitializer: KtAnonymousInitializer,
+                                             file: KtFile, statementFilter: StatementFilter): BindingTrace {
         val trace = createDelegatingTrace(anonymousInitializer)
 
         val classOrObjectDescriptor = resolveSession.resolveToDescriptor(anonymousInitializer.containingDeclaration) as LazyClassDescriptor
