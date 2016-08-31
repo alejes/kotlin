@@ -147,7 +147,7 @@ class TypeDeserializer(
     private fun computeTypeAliasDescriptor(fqNameIndex: Int): ClassifierDescriptor? {
         val id = c.nameResolver.getClassId(fqNameIndex)
         return if (id.isLocal) {
-            c.components.deserializeTypeAlias(id)
+            return null
         }
         else {
             c.components.moduleDescriptor.findTypeAliasAcrossModuleDependencies(id)
