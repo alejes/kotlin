@@ -19,6 +19,7 @@ package org.jetbrains.kotlin.idea.intentions
 import com.intellij.codeInsight.intention.HighPriorityAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
+import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.idea.core.canBePrivate
 import org.jetbrains.kotlin.idea.core.canBeProtected
@@ -67,6 +68,10 @@ open class ChangeVisibilityModifierIntention protected constructor(
             TextRange(modifierList.startOffset, defaultRange.endOffset) //TODO: smaller range? now it includes annotations too
         else
             defaultRange
+    }
+
+    override fun allowCaretInsideElement(element: PsiElement): Boolean {
+        return element !is KtDeclaration && element !is KtExpression
     }
 
     override fun applyTo(element: KtDeclaration, editor: Editor?) {
