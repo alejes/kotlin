@@ -30,6 +30,7 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.serialization.deserialization.findClassAcrossModuleDependencies
+import java.lang.UnsupportedOperationException
 import kotlin.jvm.internal.TypeIntrinsics
 import kotlin.reflect.*
 
@@ -39,7 +40,7 @@ internal class KClassImpl<T : Any>(override val jClass: Class<T>) :
         val classId = classId
 
         val descriptor =
-                if (classId.isLocal) moduleData.localClassifierResolver.resolveLocalClass(classId)
+                if (classId.isLocal) moduleData.deserialization.deserializeClass(classId)
                 else moduleData.module.findClassAcrossModuleDependencies(classId)
 
         descriptor ?: reportUnresolvedClass()
