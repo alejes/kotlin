@@ -125,7 +125,11 @@ internal class VariablesHighlightingVisitor(holder: AnnotationHolder, bindingCon
                     "Wrapped into a reference object to be modified when captured in a closure"
                 else
                     "Value captured in a closure"
-                holder.createInfoAnnotation(elementToHighlight, msg).textAttributes = WRAPPED_INTO_REF
+
+                val parent = elementToHighlight.parent
+                if (!(parent is KtProperty && parent.nameIdentifier == elementToHighlight)) {
+                    holder.createInfoAnnotation(elementToHighlight, msg).textAttributes = WRAPPED_INTO_REF
+                }
             }
 
             if (descriptor is LocalVariableDescriptor && descriptor !is SyntheticFieldDescriptor) {
